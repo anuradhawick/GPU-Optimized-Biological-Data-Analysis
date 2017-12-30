@@ -1,3 +1,5 @@
+package NeedlemanWunsch;
+
 import com.aparapi.Kernel;
 import com.aparapi.Range;
 
@@ -8,7 +10,7 @@ import java.util.*;
  */
 public class NeedlemanWunsch {
     public static void main(String[] args) {
-//        CPUNeedlemanWunsch cpuNeedlemanWunsch = new CPUNeedlemanWunsch("GCATGCU","GATTACA");
+//        NeedlemanWunsch.CPUNeedlemanWunsch cpuNeedlemanWunsch = new NeedlemanWunsch.CPUNeedlemanWunsch("GCATGCU","GATTACA");
 //        cpuNeedlemanWunsch.execute();
 
         GPUNeedlemanWunsch gpuNeedlemanWunsch = new GPUNeedlemanWunsch("GCATGCU","GATTACA");
