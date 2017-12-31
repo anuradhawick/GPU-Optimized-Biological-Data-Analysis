@@ -10,10 +10,11 @@ import java.util.*;
  */
 public class NeedlemanWunsch {
     public static void main(String[] args) {
-//        NeedlemanWunsch.CPUNeedlemanWunsch cpuNeedlemanWunsch = new NeedlemanWunsch.CPUNeedlemanWunsch("GCATGCU","GATTACA");
-//        cpuNeedlemanWunsch.execute();
+        CPUNeedlemanWunsch cpuNeedlemanWunsch = new CPUNeedlemanWunsch("GGTTGACTA", "TGTTACGG");
+        cpuNeedlemanWunsch.execute();
 
-        GPUNeedlemanWunsch gpuNeedlemanWunsch = new GPUNeedlemanWunsch("GCATGCU","GATTACA");
+        System.out.println("``````````````````````");
+        GPUNeedlemanWunsch gpuNeedlemanWunsch = new GPUNeedlemanWunsch("GGTTGACTA", "TGTTACGG");
         gpuNeedlemanWunsch.execute();
     }
 
@@ -28,8 +29,8 @@ public class NeedlemanWunsch {
     }
 
     public static void getAlignments(int xs, int ys, int GAP, int MATCH, int MISMATCH, char[] X, char[] Y, int[] matrix) {
-        int i = xs - 1;
-        int j = ys - 1;
+        int i = ys - 1;
+        int j = xs - 1;
         boolean hadPath = true;
 
         List<Stack<int[]>> stackList = new ArrayList<Stack<int[]>>();
@@ -58,13 +59,13 @@ public class NeedlemanWunsch {
                     hadPath = true;
                 }
 
-                if (i - 1 >= 0 && j - 1 >= 0 && X[i - 1] == Y[j - 1]) {
+                if (i - 1 >= 0 && j - 1 >= 0 && Y[i - 1] == X[j - 1]) {
                     if (readMatrix(i - 1, j - 1, matrix, xs) + MATCH == readMatrix(i, j, matrix, xs)) {
                         stackList.add(getClone(s, i - 1, j - 1));
                         hadPath = true;
                     }
 
-                } else if (i - 1 >= 0 && j - 1 >= 0 && X[i - 1] != Y[j - 1]) {
+                } else if (i - 1 >= 0 && j - 1 >= 0 && Y[i - 1] != X[j - 1]) {
                     if (readMatrix(i - 1, j - 1, matrix, xs) + MISMATCH == readMatrix(i, j, matrix, xs)) {
                         stackList.add(getClone(s, i - 1, j - 1));
                         hadPath = true;
@@ -95,21 +96,21 @@ public class NeedlemanWunsch {
 
                 // if a match move
                 if (i1 == i0 + 1 && j1 == j0 + 1) {
-                    xSeq += X[i0];
-                    ySeq += Y[j0];
+                    xSeq += X[j0];
+                    ySeq += Y[i0];
 
-                    matchSeq += X[i0] == Y[j0] ? "|" : " ";
+                    matchSeq += X[j0] == Y[i0] ? "|" : " ";
                 }
                 // if Y gap
                 else if (i1 == i0 + 1 && j1 == j0) {
-                    xSeq += X[i0];
+                    xSeq += Y[i0];
                     ySeq += "-";
                     matchSeq += " ";
                 }
                 // if X gap
                 else if (i1 == i0 && j1 == j0 + 1) {
                     xSeq += "-";
-                    ySeq += Y[j0];
+                    ySeq += Y[i0];
                     matchSeq += " ";
                 }
 
@@ -123,6 +124,7 @@ public class NeedlemanWunsch {
 }
 
 
+@SuppressWarnings("ALL")
 class CPUNeedlemanWunsch {
     private int GAP = -1, MISMATCH = -1, MATCH = 1, xs, ys, matrix[];
     char[] X;
@@ -146,11 +148,11 @@ class CPUNeedlemanWunsch {
             matrix[j * xs] = GAP * j;
         }
 
-        for (int i = 1; i < xs; i++) {
-            for (int j = 1; j < ys; j++) {
+        for (int i = 1; i < ys; i++) {
+            for (int j = 1; j < xs; j++) {
                 int matchVal, yGapVal, xGapVal;
                 // Match/mismatch
-                if (X[i - 1] == Y[j - 1]) {
+                if (Y[i - 1] == X[j - 1]) {
                     matchVal = matrix[(i - 1) * xs + j - 1] + MATCH;
                 } else {
                     matchVal = matrix[(i - 1) * xs + j - 1] + MISMATCH;
@@ -164,8 +166,10 @@ class CPUNeedlemanWunsch {
             }
         }
 
-        for (int i = 0; i < xs; i++) {
-            for (int j = 0; j < ys; j++) {
+        NeedlemanWunsch.getAlignments(xs, ys, GAP, MATCH, MISMATCH, X, Y, matrix);
+
+        for (int i = 0; i < ys; i++) {
+            for (int j = 0; j < xs; j++) {
                 System.out.print(matrix[i * xs + j] + "\t");
             }
             System.out.println("");
@@ -212,13 +216,13 @@ class GPUNeedlemanWunsch {
                 int i = getGlobalId() / gxs;
                 int j = getGlobalId() % gxs;
 
-                if (i >= gxs | j >= gys) return;
+                if (i >= gys | j >= gxs) return;
                 if (i == 0 | j == 0) return;
 
                 int matchVal = 0, yGapVal, xGapVal;
 
                 // Match/mismatch
-                if (gX[i - 1] == gY[j - 1]) {
+                if (gY[i - 1] == gX[j - 1]) {
                     matchVal = gmatrix[(i - 1) * gxs + j - 1] + gMATCH;
                 } else {
                     matchVal = gmatrix[(i - 1) * gxs + j - 1] + gMISMATCH;
@@ -254,8 +258,8 @@ class GPUNeedlemanWunsch {
 
         NeedlemanWunsch.getAlignments(xs, ys, GAP, MATCH, MISMATCH, X, Y, matrix);
 
-        for (int i = 0; i < gxs; i++) {
-            for (int j = 0; j < gys; j++) {
+        for (int i = 0; i < gys; i++) {
+            for (int j = 0; j < gxs; j++) {
                 System.out.print(gmatrix[i * gxs + j] + "\t");
             }
             System.out.println("");
