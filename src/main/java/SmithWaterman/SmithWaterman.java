@@ -1,22 +1,47 @@
-package NeedlemanWunsch;
+package SmithWaterman;
 
+import NeedlemanWunsch.NeedlemanWunsch;
 import com.aparapi.Kernel;
 import com.aparapi.Range;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
 
 /**
- * Created by anuradhawick on 12/30/17.
+ * Created by anuradhawick on 12/31/17.
+ *
+ * Gap extensions are not considered
  */
 @SuppressWarnings("Duplicates")
-public class NeedlemanWunsch {
+public class SmithWaterman {
     public static void main(String[] args) {
-        CPUNeedlemanWunsch cpuNeedlemanWunsch = new CPUNeedlemanWunsch("GGTTGACTA", "TGTTACGG");
-        cpuNeedlemanWunsch.execute();
+        CPUSmithWaterman cpuSmithWaterman = new CPUSmithWaterman("GGTTGACTA", "TGTTACGG");
+        cpuSmithWaterman.execute();
 
-        System.out.println("``````````````````````");
-        GPUNeedlemanWunsch gpuNeedlemanWunsch = new GPUNeedlemanWunsch("GGTTGACTA", "TGTTACGG");
-        gpuNeedlemanWunsch.execute();
+        GPUSmithWaterman gpuSmithWaterman = new GPUSmithWaterman("GGTTGACTA", "TGTTACGG");
+        gpuSmithWaterman.execute();
+    }
+
+    static List<int[]> getMaxCell(int xs, int ys, int[] matrix) {
+        int maxVal = 0;
+        List<int[]> maxCells = new ArrayList<>();
+
+        for (int i = 0; i < ys; i++) {
+            for (int j = 0; j < xs; j++) {
+                maxVal = maxVal > matrix[i * xs + j] ? maxVal : matrix[i * xs + j];
+            }
+        }
+
+        for (int i = 0; i < ys; i++) {
+            for (int j = 0; j < xs; j++) {
+                if (matrix[i * xs + j] == maxVal) {
+                    maxCells.add(new int[]{i, j});
+                }
+            }
+        }
+
+        return maxCells;
     }
 
     private static int readMatrix(int i, int j, int[] matrix, int xs) {
@@ -29,10 +54,9 @@ public class NeedlemanWunsch {
         return newStack;
     }
 
-    static void getAlignments(int xs, int ys, int GAP, int MATCH, int MISMATCH, char[] X, char[] Y, int[] matrix) {
-        int i = ys - 1;
-        int j = xs - 1;
-        boolean hadPath = true;
+    static void getAlignments(int maxI, int maxJ, int xs, int ys, int GAP, int MATCH, int MISMATCH, char[] X, char[] Y, int[] matrix) {
+        int i = maxI;
+        int j = maxJ;
 
         List<Stack<int[]>> stackList = new ArrayList<Stack<int[]>>();
         Stack<int[]> stack = new Stack<int[]>();
@@ -40,8 +64,7 @@ public class NeedlemanWunsch {
         stack.push(new int[]{i, j});
         stackList.add(stack);
 
-        while (hadPath) {
-            hadPath = false;
+        while (readMatrix(i, j, matrix, xs) != 0) {
             List<Stack<int[]>> temp = stackList;
             stackList = new ArrayList<Stack<int[]>>();
 
@@ -52,24 +75,20 @@ public class NeedlemanWunsch {
 
                 if (i - 1 >= 0 && readMatrix(i - 1, j, matrix, xs) + GAP == readMatrix(i, j, matrix, xs)) {
                     stackList.add(getClone(s, i - 1, j));
-                    hadPath = true;
                 }
 
                 if (j - 1 >= 0 && readMatrix(i, j - 1, matrix, xs) + GAP == readMatrix(i, j, matrix, xs)) {
                     stackList.add(getClone(s, i, j - 1));
-                    hadPath = true;
                 }
 
                 if (i - 1 >= 0 && j - 1 >= 0 && Y[i - 1] == X[j - 1]) {
                     if (readMatrix(i - 1, j - 1, matrix, xs) + MATCH == readMatrix(i, j, matrix, xs)) {
                         stackList.add(getClone(s, i - 1, j - 1));
-                        hadPath = true;
                     }
 
                 } else if (i - 1 >= 0 && j - 1 >= 0 && Y[i - 1] != X[j - 1]) {
                     if (readMatrix(i - 1, j - 1, matrix, xs) + MISMATCH == readMatrix(i, j, matrix, xs)) {
                         stackList.add(getClone(s, i - 1, j - 1));
-                        hadPath = true;
                     }
                 }
             }
@@ -80,7 +99,7 @@ public class NeedlemanWunsch {
         }
 
         for (Stack<int[]> s : stackList) {
-            List<int[]> path = new ArrayList<>();
+            List<int[]> path = new ArrayList<int[]>();
             while (s.size() > 0) {
                 path.add(s.pop());
             }
@@ -114,7 +133,6 @@ public class NeedlemanWunsch {
                     ySeq += "-";
                     matchSeq += " ";
                 }
-
             }
             System.out.println("\nAlignment");
             System.out.println("\t" + xSeq);
@@ -126,12 +144,12 @@ public class NeedlemanWunsch {
 
 
 @SuppressWarnings("ALL")
-class CPUNeedlemanWunsch {
-    private int GAP = -1, MISMATCH = -1, MATCH = 1, xs, ys, matrix[];
+class CPUSmithWaterman {
+    private int GAP = -3, MISMATCH = -3, MATCH = 3, xs, ys, matrix[];
     char[] X;
     char[] Y;
 
-    CPUNeedlemanWunsch(String X, String Y) {
+    CPUSmithWaterman(String X, String Y) {
         this.X = X.toCharArray();
         this.Y = Y.toCharArray();
         xs = this.X.length + 1;
@@ -141,13 +159,6 @@ class CPUNeedlemanWunsch {
 
 
     void execute() {
-        for (int i = 0; i < xs; i++) {
-            matrix[i] = GAP * i;
-        }
-
-        for (int j = 0; j < ys; j++) {
-            matrix[j * xs] = GAP * j;
-        }
 
         for (int i = 1; i < ys; i++) {
             for (int j = 1; j < xs; j++) {
@@ -161,13 +172,21 @@ class CPUNeedlemanWunsch {
                 // X Gap
                 xGapVal = matrix[(i - 1) * xs + j] + GAP;
                 // Y Gap
-                yGapVal = matrix[(i) * xs + j - 1] + GAP;
+                yGapVal = matrix[i * xs + j - 1] + GAP;
 
-                matrix[i * xs + j] = (matchVal > xGapVal ? matchVal : xGapVal) > yGapVal ? (matchVal > xGapVal ? matchVal : xGapVal) : yGapVal;
+                if (xGapVal > yGapVal) {
+                    matrix[i * xs + j] = xGapVal;
+                } else {
+                    matrix[i * xs + j] = yGapVal;
+                }
+                if (matrix[i * xs + j] < matchVal) {
+                    matrix[i * xs + j] = matchVal;
+                }
+                if (matrix[i * xs + j] < 0) {
+                    matrix[i * xs + j] = 0;
+                }
             }
         }
-
-        NeedlemanWunsch.getAlignments(xs, ys, GAP, MATCH, MISMATCH, X, Y, matrix);
 
         for (int i = 0; i < ys; i++) {
             for (int j = 0; j < xs; j++) {
@@ -175,21 +194,30 @@ class CPUNeedlemanWunsch {
             }
             System.out.println("");
         }
+
+        System.out.println("");
+
+        List<int[]> maxCells = SmithWaterman.getMaxCell(xs, ys, matrix);
+
+        for (int[] cell : maxCells) {
+            SmithWaterman.getAlignments(cell[0], cell[1], xs, ys, GAP, MATCH, MISMATCH, X, Y, matrix);
+        }
+
     }
+
 }
 
-
-class GPUNeedlemanWunsch {
-    private int GAP = -1;
-    private int MISMATCH = -1;
-    private int MATCH = 1;
+class GPUSmithWaterman {
+    private int GAP = -3;
+    private int MISMATCH = -3;
+    private int MATCH = 3;
     private int xs;
     private int ys;
     private int matrix[];
     char[] X;
     char[] Y;
 
-    GPUNeedlemanWunsch(String X, String Y) {
+    GPUSmithWaterman(String X, String Y) {
         this.X = X.toCharArray();
         this.Y = Y.toCharArray();
         xs = this.X.length + 1;
@@ -203,14 +231,6 @@ class GPUNeedlemanWunsch {
         final char[] gX = X;
         final char[] gY = Y;
 
-        for (int i = 0; i < xs; i++) {
-            gmatrix[i] = gGAP * i;
-        }
-
-        for (int j = 0; j < ys; j++) {
-            gmatrix[j * xs] = gGAP * j;
-        }
-
         Kernel kernel = new Kernel() {
             @Override
             public void run() {
@@ -221,34 +241,28 @@ class GPUNeedlemanWunsch {
                 if (i == 0 | j == 0) return;
 
                 int matchVal = 0, yGapVal, xGapVal;
-
                 // Match/mismatch
                 if (gY[i - 1] == gX[j - 1]) {
                     matchVal = gmatrix[(i - 1) * gxs + j - 1] + gMATCH;
                 } else {
                     matchVal = gmatrix[(i - 1) * gxs + j - 1] + gMISMATCH;
                 }
-
                 // X Gap
                 xGapVal = gmatrix[(i - 1) * gxs + j] + gGAP;
                 // Y Gap
                 yGapVal = gmatrix[i * gxs + j - 1] + gGAP;
 
-                // get max
-                int maxx = 0;
-
-                if (yGapVal > xGapVal) {
-                    maxx = yGapVal;
+                if (xGapVal > yGapVal) {
+                    gmatrix[i * gxs + j] = xGapVal;
                 } else {
-                    maxx = xGapVal;
+                    gmatrix[i * gxs + j] = yGapVal;
                 }
-
-                if (matchVal > maxx) {
-                    maxx = matchVal;
+                if (gmatrix[i * gxs + j] < matchVal) {
+                    gmatrix[i * gxs + j] = matchVal;
                 }
-
-
-                gmatrix[i * gxs + j] = maxx;
+                if (gmatrix[i * gxs + j] < 0) {
+                    gmatrix[i * gxs + j] = 0;
+                }
             }
         };
 
@@ -257,13 +271,17 @@ class GPUNeedlemanWunsch {
 
         matrix = gmatrix;
 
-        NeedlemanWunsch.getAlignments(xs, ys, GAP, MATCH, MISMATCH, X, Y, matrix);
-
         for (int i = 0; i < gys; i++) {
             for (int j = 0; j < gxs; j++) {
                 System.out.print(gmatrix[i * gxs + j] + "\t");
             }
             System.out.println("");
+        }
+
+        List<int[]> maxCells = SmithWaterman.getMaxCell(xs, ys, matrix);
+
+        for (int[] cell : maxCells) {
+            SmithWaterman.getAlignments(cell[0], cell[1], xs, ys, GAP, MATCH, MISMATCH, X, Y, matrix);
         }
     }
 }
