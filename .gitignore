@@ -18,6 +18,9 @@ buildNumber.properties
 
 
 .idea
+.project
+**/out
+**/*.out
 
 # Gradle:
 .idea/**/gradle.xml
